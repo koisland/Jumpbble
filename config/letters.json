@@ -25,5 +25,5 @@
     "X": {"Number": 1, "Score": 8},
     "Y": {"Number": 2, "Score": 4},
     "Z": {"Number": 1, "Score": 10},
-    "Blanks": {"Number": 2, "Score": 0}
+    "*": {"Number": 2, "Score": 0}
 }
