@@ -4,8 +4,9 @@ import pygame
 import random
 import traceback
 import pathlib
-from typing import Dict
+from typing import Dict, Tuple, Any
 from itertools import chain
+from collections import defaultdict, deque
 
 from .board import Board
 from .player import Player
@@ -15,14 +16,17 @@ class Jumpbble:
     BOARD_DIM = 15
     BOARD_BG_COLOR = (202, 164, 114)
     BOARD_GRID_COLOR = (200, 200, 200)
+    BOARD_GRID_PLAYER_COLOR = (255, 0, 0)
+    BOARD_GRID_POSSIBLE_MOVE_COLOR = (255, 215, 0)
     BOARD_FONT_COLOR = (101, 67, 33)
     WINDOW_X = 450
-    WINDOW_Y = 600
+    WINDOW_Y = 675
     BOARD_BLOCK_WIDTH = WINDOW_X // BOARD_DIM
 
+    N_TILES = 7
     CFG_DIR = pathlib.Path(__file__).parents[1].joinpath("config")
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.turns = 0
         self.player = Player(char=b"@")
         self.board = Board(
@@ -37,9 +41,17 @@ class Jumpbble:
                 *[[letter] * mdata["Number"] for letter, mdata in self.letters.items()]
             )
         )
+        self.letter_spaces = {
+            letter: (0 if letter == "*" else i)
+            for i, letter in enumerate(list(self.letters), 1)
+        }
+
         # Initialize bag order from random sample.
-        self.bag_idx = 0
-        self.bag = random.sample(self.letters_dist, len(self.letters_dist))
+        self.bag = deque(random.sample(self.letters_dist, len(self.letters_dist)))
+        # Give n tiles.
+        self.current_tiles = [self.bag.popleft() for _ in range(self.N_TILES)]
+        # Selected tile_index
+        self.selected_tile = 0
 
     def _load_special_tiles(self) -> Dict[str, float]:
         try:
@@ -62,92 +74,128 @@ class Jumpbble:
         screen = pygame.display.set_mode([self.WINDOW_X, self.WINDOW_Y])
         pygame.display.set_caption("Jumpbble")
 
-        board_char_font = pygame.font.SysFont("Arial", 25)
-        ui_next_char_font = pygame.font.SysFont("Arial", 100)
-        ui_char_font = pygame.font.SysFont("Arial", 50)
-        ui_stats_font = pygame.font.SysFont("Arial", 30)
+        BOARD_ELEMS = self._get_grid_elem()
+        BOARD_CHAR_FONT = pygame.font.SysFont("Arial", 25)
+        UI_CHAR_FONT = pygame.font.SysFont("Arial", 25)
+        # UI_STATS_FONT = pygame.font.SysFont("Arial", 20)
+
+        self.MOVEMENT_KEYS = {
+            pygame.K_w: lambda n_space: (0, n_space * -1),
+            pygame.K_a: lambda n_space: (n_space * -1, 0),
+            pygame.K_s: lambda n_space: (0, n_space),
+            pygame.K_d: lambda n_space: (n_space, 0),
+        }
+        TILE_KEYS = {
+            key: i
+            for i, key in enumerate(
+                (
+                    pygame.K_1,
+                    pygame.K_2,
+                    pygame.K_3,
+                    pygame.K_4,
+                    pygame.K_5,
+                    pygame.K_6,
+                    pygame.K_7,
+                )
+            )
+        }
+
+        current_char = self.current_tiles[self.selected_tile]
+        n_spaces = self.letter_spaces.get(current_char)
+        # Get possible coords that player can land on to render.
+        possible_new_coords = self._get_poss_new_coords(n_spaces)
 
         while True:
             screen.fill(self.BOARD_BG_COLOR)
-            self._render_ui(screen, ui_stats_font)
-            self._render_board(screen, board_char_font)
-            self._render_next_chars(screen, ui_next_char_font, ui_char_font)
+            self._render_ui(screen)
+            self._render_board(screen, BOARD_ELEMS, BOARD_CHAR_FONT)
+            self._render_curr_chars(screen, UI_CHAR_FONT)
+            for (poss_x, poss_y) in possible_new_coords:
+                self._render_block(
+                    screen,
+                    BOARD_ELEMS,
+                    poss_x,
+                    poss_y,
+                    char=None,
+                    char_font=BOARD_CHAR_FONT,
+                    block_color=self.BOARD_GRID_POSSIBLE_MOVE_COLOR,
+                )
 
             for event in pygame.event.get():
+                if len(self.current_tiles) == 0:
+                    self._render_game_over(screen)
+                    pygame.quit()
+                    sys.exit(0)
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_w:
-                        print("Moving W")
-                        self.bag_idx += 1
-                    elif event.key == pygame.K_a:
-                        print("Moving A")
-                    elif event.key == pygame.K_s:
-                        print("Moving S")
-                    elif event.key == pygame.K_d:
-                        print("Moving D")
-                    elif self.player.is_affected("diagonal"):
-                        print("Moving diagonally.")
+                    # Toggle between tiles.
+                    if event.key in TILE_KEYS:
+                        self.selected_tile = TILE_KEYS[event.key]
+
+                    current_char = self.current_tiles[self.selected_tile]
+                    n_spaces = self.letter_spaces.get(current_char)
+                    possible_new_coords = self._get_poss_new_coords(n_spaces)
+
+                    # For movement.
+                    if event.key in self.MOVEMENT_KEYS:
+                        if coord_change_func := self.MOVEMENT_KEYS.get(event.key):
+                            d_xy = coord_change_func(n_spaces)
+                            print(f"Moving by n_spaces {d_xy} for {current_char}")
+                        else:
+                            d_xy = None
+                            if self.player.is_affected("diagonal"):
+                                print("Moving diagonally.")
+
+                        # Remove placed tile from tiles and replenish tiles.
+                        try:
+                            self.current_tiles.pop(self.selected_tile)
+                            self.current_tiles.extend(self.bag.popleft())
+                        except IndexError:
+                            continue
+
+                        # Place tile on board.
+                        self.board.place_piece(d_xy, current_char)
 
             pygame.display.update()
 
-    def _render_ui(self, screen, char_font):
-        x_ui_rect, y_ui_rect = [5, self.WINDOW_X + 5]
+    def _get_poss_new_coords(self, n_spaces):
+        return [
+            self.board.calc_coords(*coord_change_func(n_spaces), *self.board.player_pos)
+            for _, coord_change_func in self.MOVEMENT_KEYS.items()
+        ]
+
+    def _render_game_over(self, screen):
+        pass
+
+    def _render_ui(self, screen):
+        x_ui_start_pos, y_ui_start_pos = [5, self.WINDOW_X + 5]
         # Draw UI bbox.
         ui_rect = pygame.Rect(
-            x_ui_rect, y_ui_rect, self.WINDOW_X - 10, self.WINDOW_Y - self.WINDOW_X - 10
+            x_ui_start_pos,
+            y_ui_start_pos,
+            self.WINDOW_X - 10,
+            self.WINDOW_Y - self.WINDOW_X - 10,
         )
         pygame.draw.rect(screen, self.BOARD_FONT_COLOR, ui_rect, 2)
 
-        x_middle_ui_rect = ((self.WINDOW_X - 10) - x_ui_rect) // 2
-        stats_rect = pygame.Rect(
-            x_middle_ui_rect,
-            y_ui_rect,
-            (self.WINDOW_X - 10) // 2,
-            self.WINDOW_Y - self.WINDOW_X - 10,
-        )
-        pygame.draw.rect(screen, self.BOARD_FONT_COLOR, stats_rect, 2)
+    def _render_curr_chars(self, screen, char_font):
 
-        # Draw index of current character, # characters left, # characters placed
-        x_middle_ui_rect = ((self.WINDOW_X - 10) - x_ui_rect) // 2
-        current_idx_msg = f"Current: {self.bag_idx + 1}"
-        left_msg = f"Left: {len(self.bag) - (self.bag_idx + 1)}"
-        score_msg = f"Score: {1}"
+        x_curr_char_start_pos, y_curr_char_start_pos = (30, self.WINDOW_X)
 
-        screen.blit(
-            char_font.render(current_idx_msg, True, self.BOARD_FONT_COLOR),
-            (x_middle_ui_rect + 30, y_ui_rect + 20),
-        )
-        screen.blit(
-            char_font.render(left_msg, True, self.BOARD_FONT_COLOR),
-            (x_middle_ui_rect + 30, y_ui_rect + 55),
-        )
-        screen.blit(
-            char_font.render(score_msg, True, self.BOARD_FONT_COLOR),
-            (x_middle_ui_rect + 30, y_ui_rect + 90),
-        )
+        for i, char in enumerate(self.current_tiles, 1):
+            curr_char_opt_text = f"{i} - {char} ({self.letter_spaces.get(char)})"
+            # Show selected char by adding '<'.
+            if i == (self.selected_tile + 1):
+                curr_char_opt_text = f"{curr_char_opt_text} <"
+            screen.blit(
+                char_font.render(curr_char_opt_text, True, self.BOARD_FONT_COLOR),
+                (x_curr_char_start_pos, y_curr_char_start_pos + (25 * i)),
+            )
 
-    def _render_next_chars(self, screen, next_char_font, char_font):
-
-        x_pos, y_pos = 30, self.WINDOW_X + 30
-
-        for i, char in enumerate(self.bag[self.bag_idx :], 1):
-            if i == 4:
-                break
-            # Render the immediate next character with larger font.
-            if i == 1:
-                screen.blit(
-                    next_char_font.render(char, True, self.BOARD_FONT_COLOR),
-                    (x_pos, y_pos),
-                )
-            else:
-                screen.blit(
-                    char_font.render(char, True, self.BOARD_FONT_COLOR),
-                    (x_pos + (40 * i - 1), y_pos),
-                )
-
-    def _render_board(self, screen, char_font):
+    def _get_grid_elem(self) -> Dict[Tuple[int, int], Dict[str, Any]]:
+        ui_grid = defaultdict(dict)
         for x in range(0, self.WINDOW_X, self.BOARD_BLOCK_WIDTH):
             for y in range(0, self.WINDOW_X, self.BOARD_BLOCK_WIDTH):
                 rect = pygame.Rect(x, y, self.BOARD_BLOCK_WIDTH, self.BOARD_BLOCK_WIDTH)
@@ -155,21 +203,49 @@ class Jumpbble:
                     x // self.BOARD_BLOCK_WIDTH,
                     y // self.BOARD_BLOCK_WIDTH,
                 )
+                ui_grid[(x_coord, y_coord)]["rect"] = rect
+                ui_grid[(x_coord, y_coord)]["px_coord"] = (x, y)
+        return ui_grid
 
-                board_char = self.board.grid[x_coord, y_coord]
-                # Format character so fit within grid.
-                if board_char == self.player.char:
-                    char_pos = (x + 3, y + 3)
-                elif board_char == self.board.SPECIAL_TILE_CHAR:
-                    char_pos = (x + 6, y + 5)
+    def _render_block(self, screen, board_elems, x, y, char, char_font, block_color):
+        rect = board_elems[(x, y)]["rect"]
+        x_px_pos, y_px_pos = board_elems[(x, y)]["px_coord"]
+
+        if char is None:
+            # Render character in grid.
+            screen.blit(
+                char_font.render(char, True, self.BOARD_FONT_COLOR),
+                (x_px_pos, y_px_pos),
+            )
+
+        pygame.draw.rect(screen, block_color, rect, 2)
+
+    def _render_board(self, screen, board_elems, char_font):
+        for x in range(self.board.grid.shape[0]):
+            for y in range(self.board.grid.shape[1]):
+                rect = board_elems[(x, y)]["rect"]
+                x_px_pos, y_px_pos = board_elems[(x, y)]["px_coord"]
+
+                board_char = self.board.grid[x, y]
+
+                # Set border color for current tile player is on.
+                if (x, y) == self.board.player_pos:
+                    block_color = self.BOARD_GRID_PLAYER_COLOR
                 else:
-                    char_pos = (x, y)
+                    block_color = self.BOARD_GRID_COLOR
 
-                # Render characte in grid.
+                # Format character so fit within grid.
+                if board_char == self.board.SPECIAL_TILE_CHAR:
+                    char_pos = (x_px_pos + 6, y_px_pos + 5)
+                else:
+                    char_pos = (x_px_pos + 3, y_px_pos + 3)
+
+                # Render character in grid.
                 screen.blit(
                     char_font.render(board_char, True, self.BOARD_FONT_COLOR), char_pos
                 )
-                pygame.draw.rect(screen, self.BOARD_GRID_COLOR, rect, 1)
+
+                pygame.draw.rect(screen, block_color, rect, 2)
 
     def reset(self):
         pass

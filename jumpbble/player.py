@@ -73,7 +73,6 @@ class Mirror(Status):
 
 class Player:
     def __init__(self, char: str):
-        self.char = char
         self.experience = 0
         self.status = {
             "mirror": Mirror(0),
