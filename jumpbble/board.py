@@ -19,7 +19,7 @@ class Board:
         self.player = player
         self.player_pos = self.STARTING_POS
         self.size = size
-        self.special_tiles_dist = special_tiles_dist.items()
+        self.special_tiles_dist = special_tiles_dist
         self.grid = self._init_board()
 
     def _init_board(self):
@@ -42,8 +42,13 @@ class Board:
         board[self.STARTING_POS] = self.STARTING_POS_CHAR
         return board
 
-    def _roll_effect(self):
-        pass
+    def _roll_effect(self) -> str:
+        rolled_effect = random.choices(
+            population=list(self.special_tiles_dist.keys()),
+            weights=list(self.special_tiles_dist.values()),
+            k=1,
+        )
+        return rolled_effect[0]
 
     def calc_coords(self, x: int, y: int, dx: int, dy: int) -> Tuple[int, int]:
         # Add change in x and y but loop across board if over board dim size.
@@ -58,9 +63,19 @@ class Board:
         # Add change in x and y but loop across board if over board dim size.
         new_x, new_y = self.calc_coords(current_x, current_y, dx, dy)
 
-        print("Landed on:", self.grid[new_x, new_y])
-        if self.grid[new_x, new_y] == self.SPECIAL_TILE_CHAR:
-            print("Landed on special tile. Rolling...")
+        landed_on_tile = self.grid[new_x, new_y]
 
-        self.grid[new_x, new_y] = char
+        if landed_on_tile == self.SPECIAL_TILE_CHAR:
+            # Roll effect
+            effect = self._roll_effect()
+
+            # Apply effect and decay rate based on status
+            self.player.status.get(effect) + self.player.status_decay
+
+            # Erase special tile
+            self.grid[new_x, new_y] = char
+
+        if landed_on_tile == "" or self.player.status.get("erase").turns != 0:
+            self.grid[new_x, new_y] = char
+
         self.player_pos = (new_x, new_y)

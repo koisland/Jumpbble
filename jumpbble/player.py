@@ -2,12 +2,12 @@ class Status:
     def __init__(self, turns: int) -> None:
         self.turns = turns
 
-    def __add__(self):
-        self.turns += 1
+    def __add__(self, n_turns):
+        self.turns += n_turns
 
-    def __sub__(self):
+    def __sub__(self, n_turns):
         if self.turns > 0:
-            self.turns -= 1
+            self.turns -= n_turns
 
 
 class Diagonal(Status):
@@ -60,7 +60,8 @@ class Erase(Status):
     Piece placement erases pre-existing pieces.
     """
 
-    pass
+    def __init__(self, turns: int) -> None:
+        super().__init__(turns)
 
 
 class Mirror(Status):
@@ -68,11 +69,13 @@ class Mirror(Status):
     Piece placement is mirrored. This ignores tile availabililty
     """
 
-    pass
+    def __init__(self, turns: int) -> None:
+        super().__init__(turns)
 
 
 class Player:
-    def __init__(self, char: str):
+    def __init__(self):
+        self.status_decay = 3
         self.experience = 0
         self.status = {
             "mirror": Mirror(0),
