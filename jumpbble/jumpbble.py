@@ -4,6 +4,7 @@ import pygame
 import random
 import traceback
 import pathlib
+import enchant
 from typing import Dict, Tuple, Any, List
 from itertools import chain
 from collections import defaultdict, deque
@@ -33,11 +34,11 @@ class Jumpbble:
     BOARD_BLOCK_WIDTH = WINDOW_X // BOARD_DIM
 
     N_TILES = 7
+    STARTING_POS = (7, 7)
     CFG_DIR = pathlib.Path(__file__).parents[1].joinpath("config")
 
     def __init__(self) -> None:
-        self.turns = 0
-        self.player = Player()
+        self.player = Player(position=self.STARTING_POS)
         self.board = Board(
             player=self.player,
             size=self.BOARD_DIM,
@@ -63,6 +64,13 @@ class Jumpbble:
         self.current_tiles = [self.bag.popleft() for _ in range(self.N_TILES)]
         # Selected tile_index
         self.selected_tile = 0
+        # Init word checker.
+        self.dictionary = enchant.Dict("en_US")
+        self.all_words = set()
+
+        # Debug stuff.
+        self.debug_mode = False
+        self.debug_input = ""
 
     def _load_special_tiles(self) -> Dict[str, float]:
         try:
@@ -79,6 +87,37 @@ class Jumpbble:
         except Exception:
             traceback.print_exc()
             sys.exit(1)
+
+    def _debug_mode(self, event) -> None:
+        # Escape to exit.
+        if event.key == pygame.K_ESCAPE:
+            print("Exiting debug mode.")
+            self.debug_mode = False
+            self.debug_input = ""
+        # Enter and execute command.
+        if event.key == pygame.K_RETURN:
+            print(self.debug_input)
+            if effect := self.player.status.get(self.debug_input):
+                effect + 3
+        # Allow editing
+        elif event.key == pygame.K_BACKSPACE:
+            self.debug_input = self.debug_input[:-1]
+            print(self.debug_input)
+        # Allow jumping to any position.
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            x_px, y_px = pygame.mouse.get_pos()
+            current_x, current_y = self.player.position
+            clicked_x, clicked_y = (
+                x_px // self.BOARD_BLOCK_WIDTH,
+                y_px // self.BOARD_BLOCK_WIDTH,
+            )
+            d_xy = (clicked_x - current_x, clicked_y - current_y)
+
+            self._exec_move(d_xy, self.current_tiles[self.selected_tile])
+        else:
+            # Add input.
+            self.debug_input += event.unicode
+            print(self.debug_input)
 
     def start(self) -> None:
         pygame.init()
@@ -128,6 +167,7 @@ class Jumpbble:
             self._render_curr_chars(screen, UI_CHAR_FONT)
             self._render_stats(screen, UI_CHAR_FONT)
 
+            # Game over.
             if len(self.current_tiles) == 0:
                 self._render_game_over(screen)
                 pygame.quit()
@@ -153,34 +193,64 @@ class Jumpbble:
                     )
 
             for event in pygame.event.get():
+                # Update score after each event.
+                for word in self.board.find_words():
+                    score = self._get_score(word)
+                    if score != 0:
+                        if word not in self.all_words:
+                            self.all_words.add(word)
+                            self.player.score += score
+
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+
+                # Cycle through letters
+                if event.type == pygame.MOUSEBUTTONUP and event.button == 4:
+                    if self.selected_tile >= 1:
+                        self.selected_tile -= 1
+                if event.type == pygame.MOUSEBUTTONUP and event.button == 5:
+                    if self.selected_tile < self.N_TILES - 1:
+                        self.selected_tile += 1
+
                 # Enable placing on grid by mouse-click.
-                if event.type == pygame.MOUSEBUTTONUP:
+                if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     x_px, y_px = pygame.mouse.get_pos()
+                    current_x, current_y = self.player.position
+                    clicked_x, clicked_y = (
+                        x_px // self.BOARD_BLOCK_WIDTH,
+                        y_px // self.BOARD_BLOCK_WIDTH,
+                    )
+                    d_xy = (clicked_x - current_x, clicked_y - current_y)
 
-                    # Jump, wildcard, or wildcard tile.
-                    if any(
-                        [
-                            self.player.is_affected("jump"),
-                            self.player.is_affected("wildcard"),
-                            n_spaces == 0,
-                        ]
-                    ):
-                        current_x, current_y = self.board.player_pos
-                        clicked_x, clicked_y = (
-                            x_px // self.BOARD_BLOCK_WIDTH,
-                            y_px // self.BOARD_BLOCK_WIDTH,
-                        )
-                        d_xy = (clicked_x - current_x, clicked_y - current_y)
-
+                    # Jump or wildcard tile.
+                    if any([self.player.is_affected("jump"), n_spaces == 0]):
+                        self._exec_move(d_xy, current_char)
+                    # Allow clicking if move within possible_new_coords.
+                    elif (clicked_x, clicked_y) in possible_new_coords:
                         self._exec_move(d_xy, current_char)
 
                 if event.type == pygame.KEYDOWN:
                     # Toggle between tiles.
+                    if self.debug_mode:
+                        self._debug_mode(event)
+                        break
+
+                    if event.key == pygame.K_ESCAPE and self.debug_mode is False:
+                        print("In debug mode.")
+                        self.debug_mode = True
+                        break
+
                     if event.key in TILE_KEYS:
                         self.selected_tile = TILE_KEYS[event.key]
+
+                    # If wildcard, allow any letter.
+                    if self.player.is_affected("wildcard"):
+                        wildcard = str(event.unicode).upper()
+                        if wildcard in self.letters:
+                            self.current_tiles[self.selected_tile] = wildcard
+                        else:
+                            break
 
                     current_char = self.current_tiles[self.selected_tile]
                     n_spaces = self.letter_spaces.get(current_char)
@@ -202,6 +272,15 @@ class Jumpbble:
                         self._exec_move(d_xy, current_char)
 
             pygame.display.update()
+
+    def _get_score(self, word: str) -> int:
+        if self.dictionary.check(word):
+            word_score = sum(
+                self.letters[letter.upper()]["Score"] for letter in list(word)
+            )
+            return word_score
+        else:
+            return 0
 
     def _next_letter(self, char: str) -> str:
         letter_list = list(self.letters)
@@ -228,13 +307,13 @@ class Jumpbble:
         except IndexError:
             pass
 
-        # Place tile on board.
-        self.board.place_piece(d_xy, current_char)
-
         # Mirror move by multiple change in x and y by -1.
         if self.player.is_affected("mirror"):
             mirrored_d_xy = [d_var * -1 for d_var in d_xy]
-            self.board.place_piece(mirrored_d_xy, current_char)
+            self.board.place_piece(mirrored_d_xy, current_char, update_player_pos=False)
+
+        # Place tile on board.
+        self.board.place_piece(d_xy, current_char)
 
         # Decay any status effect.
         for _, status in self.player.status.items():
@@ -254,7 +333,7 @@ class Jumpbble:
 
             coords.append(
                 self.board.calc_coords(
-                    *coord_change_func(n_spaces), *self.board.player_pos
+                    *coord_change_func(n_spaces), *self.player.position
                 )
             )
         return coords
@@ -284,7 +363,7 @@ class Jumpbble:
         stat_texts = [
             f"Level: {self.player.level}",
             f"Tiles Left: {len(self.bag)}",
-            f"Score: {1}",
+            f"Score: {self.player.score}",
             "Status:",
         ]
         for i, stat_text in enumerate(stat_texts, 1):
@@ -352,7 +431,7 @@ class Jumpbble:
                 board_char = self.board.grid[x, y]
 
                 # Set border color for current tile player is on.
-                if (x, y) == self.board.player_pos:
+                if (x, y) == self.player.position:
                     block_color = self.BOARD_GRID_PLAYER_COLOR
                 else:
                     block_color = self.BOARD_GRID_COLOR

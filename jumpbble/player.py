@@ -74,9 +74,11 @@ class Mirror(Status):
 
 
 class Player:
-    def __init__(self):
+    def __init__(self, position):
+        self.score = 0
         self.status_decay = 3
         self.experience = 0
+        self.position = position
         self.status = {
             "mirror": Mirror(0),
             "diagonal": Diagonal(0),
@@ -89,7 +91,7 @@ class Player:
 
     @property
     def level(self):
-        return self.experience // 10
+        return self.score // 10
 
     def is_affected(self, status: str) -> bool:
         if status_effect := self.status.get(status):
