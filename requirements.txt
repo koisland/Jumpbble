@@ -1,0 +1,13 @@
+cfgv==3.3.1
+distlib==0.3.5
+filelock==3.8.0
+identify==2.5.3
+nodeenv==1.7.0
+numpy==1.23.2
+platformdirs==2.5.2
+pre-commit==2.20.0
+pyenchant==3.2.2
+pygame==2.1.2
+PyYAML==6.0
+toml==0.10.2
+virtualenv==20.16.3

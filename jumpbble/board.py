@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from typing import Dict, Generator, Tuple
+from typing import Dict, Iterator, Tuple, List
 
 from .player import Player
 
@@ -54,7 +54,7 @@ class Board:
         new_y = (y + dy) % self.size
         return (new_x, new_y)
 
-    def find_words(self) -> Generator:
+    def find_words(self) -> Iterator[Tuple[str, List[Tuple[int, int]]]]:
         # For each axis on grid.
         for i in range(0, 2):
             # For each row/col on grid.
@@ -69,18 +69,29 @@ class Board:
                     continue
 
                 words = []
-                word = ""
-                for char in axis_vals:
+                word_chars = {}
+                for n_char, char in enumerate(axis_vals):
                     # On empty space. Stop appending characters to word.
                     if char == "":
+                        word_len = len(word_chars)
                         # If word is not one character, add.
-                        if len(word) > 1:
-                            words.append(word)
-                        # Reset word
-                        word = ""
+                        if word_len > 1:
+                            # Since all on same row/col, x/y should be all same value.
+                            axis_vals = [axis_idx] * word_len
+                            word = "".join(word_chars.values())
+                            # Store all letter positions.
+                            word_pos = (
+                                zip(axis_vals, word_chars.keys())
+                                if i == 0
+                                else zip(word_chars.keys(), axis_vals)
+                            )
+                            words.append((word, list(word_pos)))
+                        # Reset word char list
+                        word_chars.clear()
                         continue
                     if char not in self.DEFAULT_CHARS:
-                        word += char.decode()
+                        # Append index and character.
+                        word_chars[n_char] = char.decode()
 
                 yield from words
 

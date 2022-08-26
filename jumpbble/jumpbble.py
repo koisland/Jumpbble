@@ -29,6 +29,7 @@ class Jumpbble:
         (0, 0, 255),
     )
     BOARD_FONT_COLOR = (101, 67, 33)
+    BOARD_WORD_COLOR = (0, 100, 0)
     WINDOW_X = 450
     WINDOW_Y = 675
     BOARD_BLOCK_WIDTH = WINDOW_X // BOARD_DIM
@@ -67,12 +68,18 @@ class Jumpbble:
         # Init word checker.
         self.dictionary = enchant.Dict("en_US")
         self.all_words = set()
+        self.all_word_pos = set()
 
         # Debug stuff.
         self.debug_mode = False
         self.debug_input = ""
 
     def _load_special_tiles(self) -> Dict[str, float]:
+        """
+        Load special tiles.
+
+        :return: special tiles dictionary where key is effect and value is percent probability.
+        """
         try:
             with open(self.CFG_DIR.joinpath("special_tiles.json")) as json_stream:
                 return json.load(json_stream)
@@ -80,7 +87,12 @@ class Jumpbble:
             traceback.print_exc()
             sys.exit(1)
 
-    def _load_letters(self) -> Dict[str, float]:
+    def _load_letters(self) -> Dict[str, Dict[str, int]]:
+        """
+        Load letters with number and point value.
+
+        :return:
+        """
         try:
             with open(self.CFG_DIR.joinpath("letters.json")) as json_stream:
                 return json.load(json_stream)
@@ -172,10 +184,12 @@ class Jumpbble:
                 self._render_game_over(screen)
                 pygame.quit()
                 sys.exit(0)
-
-            current_char = self.current_tiles[self.selected_tile]
-            n_spaces = self.letter_spaces.get(current_char)
-            possible_new_coords = self._get_poss_new_coords(n_spaces)
+            try:
+                current_char = self.current_tiles[self.selected_tile]
+                n_spaces = self.letter_spaces.get(current_char)
+                possible_new_coords = self._get_poss_new_coords(n_spaces)
+            except (IndexError, KeyError):
+                continue
 
             # Render colors. If blind, disable.
             if self.player.is_affected("blind") is False:
@@ -194,9 +208,13 @@ class Jumpbble:
 
             for event in pygame.event.get():
                 # Update score after each event.
-                for word in self.board.find_words():
+                for word, word_pos in self.board.find_words():
                     score = self._get_score(word)
                     if score != 0:
+                        # Add positions of words to render.
+                        for pos in word_pos:
+                            self.all_word_pos.add(pos)
+
                         if word not in self.all_words:
                             self.all_words.add(word)
                             self.player.score += score
@@ -249,6 +267,7 @@ class Jumpbble:
                         wildcard = str(event.unicode).upper()
                         if wildcard in self.letters:
                             self.current_tiles[self.selected_tile] = wildcard
+                            break
                         else:
                             break
 
@@ -364,6 +383,7 @@ class Jumpbble:
             f"Level: {self.player.level}",
             f"Tiles Left: {len(self.bag)}",
             f"Score: {self.player.score}",
+            f"Words: {len(self.all_words)}",
             "Status:",
         ]
         for i, stat_text in enumerate(stat_texts, 1):
@@ -443,9 +463,12 @@ class Jumpbble:
                     char_pos = (x_px_pos + 3, y_px_pos + 3)
 
                 # Render character in grid.
-                screen.blit(
-                    char_font.render(board_char, True, self.BOARD_FONT_COLOR), char_pos
+                font_color = (
+                    self.BOARD_WORD_COLOR
+                    if (x, y) in self.all_word_pos
+                    else self.BOARD_FONT_COLOR
                 )
+                screen.blit(char_font.render(board_char, True, font_color), char_pos)
 
                 pygame.draw.rect(screen, block_color, rect, 2)
 

@@ -1,9 +1,9 @@
 {
     "ordered": 0.2,
     "diagonal": 0.2,
-    "wildcard": 0.1,
-    "jump": 0.05,
-    "blind": 0.2,
-    "erase": 0.2,
+    "wildcard": 0.2,
+    "jump": 0.1,
+    "blind": 0.1,
+    "erase": 0.15,
     "mirror": 0.05
 }
