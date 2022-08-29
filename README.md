@@ -19,6 +19,7 @@ Scrabble roguelike.
 * [Items]()
 * [Scoring](#scoring)
 * [Configuration](#configuration)
+
 -----
 
 ## Player Movement
@@ -61,9 +62,14 @@ Effects are triggered by landing on a special, randomized `'?'` tile.
 
 ### Jump
 * Allows placement of a tile anywhere.
+* **A free jump is given after completing a word.**
 
 ### Blind
 * Lose ghost tiles temporarily.
+    <p>
+    <img src="docs/images/non_blind.png" height="33%">
+    <img src="docs/images/blind.png" height="33%">
+    </p>
 
 ### Erase
 * Placing a letter on top of another will remove it.
@@ -84,6 +90,7 @@ Effects are triggered by landing on a special, randomized `'?'` tile.
 -----
 
 ## Levels
+Only one atm.
 
 -----
 
@@ -92,10 +99,15 @@ Effects are triggered by landing on a special, randomized `'?'` tile.
 Words do not need to connect to any existing words to be valid.
 
 If a word is valid, all of the letters creating it will be highlighted green.
+    <p>
+    <img src="docs/images/green_tiles.png" height="33%">
+    <img src="docs/images/erase_tile.png" height="33%">
+    </p>
+* Erasing a letter will not affect adjacent pre-existing green letter.
+    * Points will not be awarded if a new word is not made.
 
 Word validity is determined through the `pyenchant` package.
-
-### Point Multiplier
+* This means that common abbreviations are valid (ex. `bn` for a billion).
 
 ## Configuration
 To adjust letter distribution: `config/letters.json`
@@ -104,3 +116,7 @@ To adjust letter distribution: `config/letters.json`
 
 To adjust special tile distribution: `config/special_tiles.json`
 * Values represent the probability of an effect.
+
+
+## Credit
+Background music is ["NPC Theme" by **HoliznaCC0**](https://freemusicarchive.org/music/holiznacc0/chiptunes/npc-theme/) from the Free Music Archive.

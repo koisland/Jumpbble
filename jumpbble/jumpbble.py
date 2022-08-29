@@ -37,6 +37,8 @@ class Jumpbble:
     N_TILES = 7
     STARTING_POS = (7, 7)
     CFG_DIR = pathlib.Path(__file__).parents[1].joinpath("config")
+    RES_DIR = pathlib.Path(__file__).parents[1].joinpath("resources")
+    BG_MUSIC = RES_DIR.joinpath("audio", "HoliznaCC0_NPC_Theme.mp3")
 
     def __init__(self) -> None:
         self.player = Player(position=self.STARTING_POS)
@@ -91,7 +93,7 @@ class Jumpbble:
         """
         Load letters with number and point value.
 
-        :return:
+        :return: all letters and their movement values and score
         """
         try:
             with open(self.CFG_DIR.joinpath("letters.json")) as json_stream:
@@ -135,6 +137,10 @@ class Jumpbble:
         pygame.init()
         screen = pygame.display.set_mode([self.WINDOW_X, self.WINDOW_Y])
         pygame.display.set_caption("Jumpbble")
+        # Setup music
+        pygame.mixer.init()
+        pygame.mixer.music.load(self.BG_MUSIC)
+        pygame.mixer.music.play(-1)
 
         BOARD_ELEMS = self._get_grid_elem()
         BOARD_CHAR_FONT = pygame.font.SysFont("Arial", 25)
@@ -219,6 +225,9 @@ class Jumpbble:
                             self.all_words.add(word)
                             self.player.score += score
 
+                            # If valid word, allow player to jump.
+                            self.player.status.get("jump") + 1
+
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
@@ -262,8 +271,8 @@ class Jumpbble:
                     if event.key in TILE_KEYS:
                         self.selected_tile = TILE_KEYS[event.key]
 
-                    # If wildcard, allow any letter.
-                    if self.player.is_affected("wildcard"):
+                    # If wildcard effect or tile, allow any letter.
+                    if self.player.is_affected("wildcard") or current_char == '*':
                         wildcard = str(event.unicode).upper()
                         if wildcard in self.letters:
                             self.current_tiles[self.selected_tile] = wildcard

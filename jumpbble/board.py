@@ -72,7 +72,7 @@ class Board:
                 word_chars = {}
                 for n_char, char in enumerate(axis_vals):
                     # On empty space. Stop appending characters to word.
-                    if char == "":
+                    if char in ["", b'?']:
                         word_len = len(word_chars)
                         # If word is not one character, add.
                         if word_len > 1:
