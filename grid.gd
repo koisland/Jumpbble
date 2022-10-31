@@ -2,19 +2,37 @@
 # calculate and convert coordinates.
 # It's meant to be shared between game objects that need access to those values.
 class_name Grid
-extends Resource
 
+extends TileMap
+
+onready var player_sprite = get_node("../Player/AnimatedSprite")
+
+const str_null_char: String = "-"
 # The grid's size in rows and columns.
-export var size := Vector2(15, 15)
-# The size of a cell in pixels.
-export var cell_size := Vector2(80, 80)
+var int_dim: int = cell_quadrant_size
+var vec_size := Vector2(int_dim, int_dim)
+var arr_grid := init_grid()
 
+# Starting position.
+var vec_starting_pos = Vector2(int_dim / 2, int_dim / 2)
+
+# Initialize grid as one dim array.
+func init_grid() -> Array:
+	var new_grid := Array()
+	for x in int_dim:
+		for y in int_dim:
+			new_grid.push_back(str_null_char)
+	return new_grid
+
+func _ready():
+	# Set player model to middle of board.
+	player_sprite.position = calculate_map_position(vec_starting_pos)
+	
 # Half of ``cell_size``.
 # We will use this to calculate the center of a grid cell in pixels, on the screen.
 # That's how we can place units in the center of a cell.
 var _half_cell_size = cell_size / 2
-
-
+	
 # Returns the position of a cell's center in pixels.
 # We'll place units and have them move through cells using this function.
 func calculate_map_position(grid_position: Vector2) -> Vector2:
@@ -34,8 +52,8 @@ func calculate_grid_coordinates(map_position: Vector2) -> Vector2:
 # This method and the following one allow us to ensure the cursor or units can never go past the
 # map's limit.
 func is_within_bounds(cell_coordinates: Vector2) -> bool:
-	var out := cell_coordinates.x >= 0 and cell_coordinates.x < size.x
-	return out and cell_coordinates.y >= 0 and cell_coordinates.y < size.y
+	var out := cell_coordinates.x >= 0 and cell_coordinates.x < vec_size.x
+	return out and cell_coordinates.y >= 0 and cell_coordinates.y < vec_size.y
 
 
 # Makes the `grid_position` fit within the grid's bounds.
@@ -43,10 +61,10 @@ func is_within_bounds(cell_coordinates: Vector2) -> bool:
 # The Vector2 class comes with its `Vector2.clamp()` method, but it doesn't work the same way: it
 # limits the vector's length instead of clamping each of the vector's components individually.
 # That's why we need to code a new method.
-func clamp(grid_position: Vector2) -> Vector2:
+func grid_clamp(grid_position: Vector2) -> Vector2:
 	var out := grid_position
-	out.x = clamp(out.x, 0, size.x - 1.0)
-	out.y = clamp(out.y, 0, size.y - 1.0)
+	out.x = clamp(out.x, 0, vec_size.x - 1.0)
+	out.y = clamp(out.y, 0, vec_size.y - 1.0)
 	return out
 
 
@@ -58,4 +76,4 @@ func clamp(grid_position: Vector2) -> Vector2:
 # graph it uses to find a path.
 # 2. You can use it for performance. More on that below.
 func as_index(cell: Vector2) -> int:
-	return int(cell.x + size.x * cell.y)
+	return int(cell.x + vec_size.x * vec_size.y)

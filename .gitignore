@@ -1,3 +1,4 @@
 .import
 .mono
-
+default_env.tres
+*.import

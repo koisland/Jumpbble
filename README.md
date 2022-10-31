@@ -1,8 +1,6 @@
 # Jumpbble
 Scrabble roguelike.
 
-<p><img src="docs/images/jumpbble.png" height="33%"></p>
-
 -----
 
 ## Table-of-Contents
@@ -21,7 +19,7 @@ Scrabble roguelike.
 * [Configuration](#configuration)
 
 -----
-
+<!-- 
 ## Player Movement
 Players can move in all eight directions.
 
@@ -119,4 +117,4 @@ To adjust special tile distribution: `config/special_tiles.json`
 
 
 ## Credit
-Background music is ["NPC Theme" by **HoliznaCC0**](https://freemusicarchive.org/music/holiznacc0/chiptunes/npc-theme/) from the Free Music Archive.
+Background music is ["NPC Theme" by **HoliznaCC0**](https://freemusicarchive.org/music/holiznacc0/chiptunes/npc-theme/) from the Free Music Archive. -->

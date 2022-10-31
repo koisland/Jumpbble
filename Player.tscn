@@ -1,6 +1,6 @@
 [gd_scene load_steps=15 format=2]
 
-[ext_resource path="res://Player.gd" type="Script" id=1]
+[ext_resource path="res://player.gd" type="Script" id=1]
 [ext_resource path="res://assets/piskel/jumpbble_main_char_walk.png" type="Texture" id=2]
 [ext_resource path="res://assets/piskel/jumpbble_main_char_fjump.png" type="Texture" id=3]
 [ext_resource path="res://assets/piskel/jumpbble_main_char_bjump.png" type="Texture" id=4]
@@ -85,5 +85,4 @@ animation = "default_front"
 playing = true
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2( 0, 1 )
 shape = SubResource( 11 )
